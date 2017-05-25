@@ -1,72 +1,38 @@
-(ns ribbon.core
-  (:require [amazonica.aws.sqs :as sqs]
-            [cognitect.transit :as transit]
-            [clojure.data.json :as json])
-  (:import [java.io ByteArrayOutputStream]))
+(ns ribbon.core)
 
-(def cfg {:serializer :json})
-
-(def cred {:access-key ""
-           :secret-key ""
-           :endpoint "us-west-1"})
-
-(def queue (sqs/find-queue cred "foo"))
-
-(defmulti process-action :action)
-
-(defmethod process-action :foo
-  [data]
-  (assoc data :ready true))
-
-(defmethod process-action :default
-  [data]
-  (println data)
-  nil)
-
-(defn purge-queue [])
+(def config {:serializer :json})
 
 (defn dispatch-first-arg
   [& args]
   (first args))
 
-;;
-;; (de)serializes
-;;
-(defmulti serialize dispatch-first-arg)
+(defmulti process-action :action)
 
-(defmethod serialize :json
-  [_ data]
-  (json/write-str data))
+(defmethod process-action :default
+  [data]
+  data)
+
+(defmulti purge-queue dispatch-first-arg)
+
+(defmulti serialize dispatch-first-arg)
 
 (defmulti deserialize dispatch-first-arg)
 
-(defmethod deserialize :json
-  [_ string]
-  (json/read-str string :key-fn keyword))
+(defmulti read-message dispatch-first-arg)
 
-(defn read-message
-  []
-  (-> (sqs/receive-message cred queue)
-      :messages ;; todo
-      first))
+(defmulti ack-message dispatch-first-arg)
+
+(defmulti send-message dispatch-first-arg)
+
+(defmulti get-message-data dispatch-first-arg)
 
 (defn process-message
   [message]
-  (let [{:keys [receipt-handle
-                message-id
-                body
-                md5of-body]} message
-        data (deserialize (:serializer cfg) body)
+  (let [data (get-message-data :aws message)
         result (process-action data)]
-    (sqs/delete-message cred queue receipt-handle)
+    (ack-message :aws message)
     result))
 
 (defn worker []
-  (when-let [message (read-message)]
+  (when-let [message (read-message :aws)]
     (process-message message)))
-
-(defn send-message
-  [data]
-  (sqs/send-message
-   cred queue
-   (serialize (:serializer cfg) data)))
