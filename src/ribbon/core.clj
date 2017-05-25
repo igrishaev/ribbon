@@ -1,38 +1,56 @@
 (ns ribbon.core)
 
-(def config {:serializer :json})
+(def config {:serializer :json
+             :backend :aws
+             :action :action
+             :aws {:cred {:access-key ""
+                          :secret-key ""
+                          :endpoint "us-west-1"}
+                   :queue-url "https://sqs.us-west-1.amazonaws.com/"}})
 
-(defn dispatch-first-arg
-  [& args]
-  (first args))
+(defn dispatch-backend
+  [config & _]
+  (:backend config))
 
-(defmulti process-action :action)
+(defn dispatch-serializer
+  [config & _]
+  (:serializer config))
+
+(defn dispatch-action
+  [config & _]
+  (:action config))
+
+(defmulti process-action dispatch-action)
 
 (defmethod process-action :default
   [data]
   data)
 
-(defmulti purge-queue dispatch-first-arg)
+(defmethod process-action 42
+  [data]
+  424242)
 
-(defmulti serialize dispatch-first-arg)
+(defmulti serialize dispatch-serializer)
 
-(defmulti deserialize dispatch-first-arg)
+(defmulti deserialize dispatch-serializer)
 
-(defmulti read-message dispatch-first-arg)
+(defmulti purge-queue dispatch-backend)
 
-(defmulti ack-message dispatch-first-arg)
+(defmulti read-message dispatch-backend)
 
-(defmulti send-message dispatch-first-arg)
+(defmulti ack-message dispatch-backend)
 
-(defmulti get-message-data dispatch-first-arg)
+(defmulti send-message dispatch-backend)
+
+(defmulti get-message-data dispatch-backend)
 
 (defn process-message
-  [message]
-  (let [data (get-message-data :aws message)
+  [config message]
+  (let [data (get-message-data config message)
         result (process-action data)]
-    (ack-message :aws message)
+    (ack-message config message)
     result))
 
-(defn worker []
-  (when-let [message (read-message :aws)]
-    (process-message message)))
+(defn worker [config]
+  (when-let [message (read-message config)]
+    (process-message config message)))

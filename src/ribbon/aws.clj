@@ -1,6 +1,5 @@
 (ns ribbon.aws
-  (:require [ribbon.core :refer [config
-                                 send-message
+  (:require [ribbon.core :refer [send-message
                                  read-message
                                  ack-message
                                  get-message-data
@@ -8,31 +7,36 @@
                                  deserialize]]
             [amazonica.aws.sqs :as sqs]))
 
-(def cred {:access-key ""
-           :secret-key ""
-           :endpoint "us-west-1"})
-
-(def queue (sqs/find-queue cred "foo"))
+;; (def queue (sqs/find-queue cred "foo"))
 
 (defmethod send-message :aws
-  [_ data]
-  (sqs/send-message
-   cred queue
-   (serialize :json data)))
+  [config data & args]
+  (apply sqs/send-message
+         (-> config :aws :cred)
+         (-> config :aws :queue-url)
+         (serialize config data)
+         args))
 
 (defmethod read-message :aws
-  [_]
-  (-> (sqs/receive-message cred queue)
+  [config & args]
+  (-> sqs/receive-message
+      (apply
+       (-> config :aws :cred)
+       (-> config :aws :queue-url)
+       args)
       :messages ;; todo
       first))
 
 (defmethod get-message-data :aws
-  [_ message]
+  [config message]
   (->> message
        :body
-       (deserialize :json)))
+       (deserialize config)))
 
 (defmethod ack-message :aws
-  [_ message]
-  (sqs/delete-message cred queue (:receipt-handle message))
+  [config message]
+  (sqs/delete-message
+   (-> config :aws :cred)
+   (-> config :aws :queue-url)
+   (:receipt-handle message))
   nil)

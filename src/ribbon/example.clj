@@ -1,5 +1,6 @@
 (ns ribbon.example
-  (:require [ribbon.core :refer [send-message
+  (:require [ribbon.core :refer [config
+                                 send-message
                                  read-message
                                  worker]]
             [ribbon.aws]
