@@ -22,14 +22,6 @@
 
 (defmulti process-action dispatch-action)
 
-(defmethod process-action :default
-  [data]
-  data)
-
-(defmethod process-action 42
-  [data]
-  424242)
-
 (defmulti serialize dispatch-serializer)
 
 (defmulti deserialize dispatch-serializer)
@@ -54,3 +46,12 @@
 (defn worker [config]
   (when-let [message (read-message config)]
     (process-message config message)))
+
+(defprotocol IWorker
+  (start [this])
+  (stop [this]))
+
+(defrecord Worker [queue]
+  IWorker
+  (start [_]
+    (+ queue 42)))
